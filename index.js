@@ -1,76 +1,37 @@
-const express = require("express");
-const pool = require("./db");
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import http from "http";
+import { Server } from "socket.io";
+import authRoutes from "./routes/auth.js";
+import userRoutes from "./routes/users.js";
+import { authenticateSocket } from "./middleware/auth.js";
+import { initSocketHandlers } from "./sockets/index.js";
+import db from "./config/db.js";
+
+dotenv.config();
 
 const app = express();
-const PORT = 8080;
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+    },
+});
 
+app.use(cors());
 app.use(express.json());
 
-app.get("/users", async (req, res) => {
-    const client = await pool.connect();
-    try {
-        const result = await client.query("SELECT * FROM users");
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server Error");
-    } finally {
-        client.release();
-    }
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+
+io.use(authenticateSocket);
+io.on("connection", (socket) => {
+    initSocketHandlers(io, socket);
 });
 
-app.post("/users", async (req, res) => {
-    const client = await pool.connect();
+const PORT = process.env.PORT || 8080;
 
-    const { name, email } = req.body;
-
-    if (!(name && email)) {
-        return res.status(400).json({ error: "Name and Email are required" });
-    }
-
-    try {
-        await client.query("BEGIN");
-        const result = await client.query(
-            "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *",
-            [name, email]
-        );
-        res.status(201).json(result.rows[0]);
-        await client.query("COMMIT");
-    } catch (err) {
-        await client.query("ROLLBACK");
-        console.error("Error inserting user: ", err.message);
-        res.status(500).json({ error: "Internal server error" });
-    } finally {
-        client.release();
-    }
+server.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
 });
-
-app.delete("/users", async (req, res) => {
-    const client = await pool.connect();
-    const { email } = req.body;
-
-    if (!email) {
-        return res.status(400).json({ error: "Email is required" });
-    }
-
-    try {
-        await client.query("BEGIN");
-        const result = await client.query(
-            "DELETE FROM users WHERE email = $1",
-            [email]
-        );
-        res.status(200).json(result.rowCount);
-        await client.query("COMMIT");
-        client;
-    } catch (err) {
-        await client.query("ROLLBACK");
-        console.error("Error deleting user: ", err.message);
-        res.status(500).json({ error: "Internal server error" });
-    } finally {
-        client.release();
-    }
-});
-
-app.listen(PORT, () =>
-    console.log(`App available on http://localhost:${PORT}`)
-);
