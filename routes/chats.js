@@ -4,6 +4,24 @@ import { authenticateToken } from "../middleware/auth.js";
 
 const chatRoutes = express.Router();
 
+async function verifyConversationAccess(req, res, next) {
+    const conversationId = req.params.conversationId;
+    try {
+        const result = await db.query(
+            "SELECT * FROM conversations WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)",
+            [conversationId, req.user.userId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(403).json({ error: "Access denied" });
+        }
+        next();
+    } catch (err) {
+        console.error("Conversation access verification failed: ", err);
+        res.status(500).json({ error: "Server error" });
+    }
+}
+
+
 chatRoutes.post("/start", authenticateToken, async (req, res) => {
     const { user2_id } = req.body;
 
@@ -31,21 +49,32 @@ chatRoutes.get("/", authenticateToken, async (req, res) => {
         if (result.rowCount === 0) return res.json([]);
 
         const conversations = result.rows.map((conversation) => {
-            return conversation.user1_id === req.user.userId
+            const otherUserId = conversation.user1_id === req.user.userId
                 ? conversation.user2_id
                 : conversation.user1_id;
+            
+            return {
+                userId: otherUserId,
+                conversationId: conversation.id
+            };
         });
 
-        const uniqueContacts = [...new Set(conversations)];
-
-        if (uniqueContacts.length === 0) return res.json([]);
+        const userIds = conversations.map(c => c.userId);
 
         const contacts = await db.query(
             "SELECT id, name, image_url FROM users WHERE id = ANY($1)",
-            [uniqueContacts]
+            [userIds]
         );
 
-        res.json(contacts.rows);
+        const finalResult = contacts.rows.map(user => {
+            const convo = conversations.find(c => c.userId === user.id);
+            return {
+                ...user,
+                conversationId: convo.conversationId
+            };
+        });
+
+        res.json(finalResult);
     } catch (err) {
         console.error("Failed to fetch contacts: ", err);
         res.status(500).json({ error: "Failed to fetch contacts" });
@@ -55,6 +84,7 @@ chatRoutes.get("/", authenticateToken, async (req, res) => {
 chatRoutes.get(
     "/:conversationId/messages",
     authenticateToken,
+    verifyConversationAccess,
     async (req, res) => {
         const conversationId = req.params.conversationId;
 
@@ -74,6 +104,7 @@ chatRoutes.get(
 chatRoutes.post(
     "/:conversationId/message",
     authenticateToken,
+    verifyConversationAccess,
     async (req, res) => {
         const conversationId = req.params.conversationId;
         const { content } = req.body;
@@ -82,10 +113,11 @@ chatRoutes.post(
             return res.status(400).json({ error: "Content is required" });
 
         try {
-            await db.query(
-                "INSERT INTO messages (conversation_id, sender_id, content) VALUES ($1, $2, $3)",
+            const result = await db.query(
+                "INSERT INTO messages (conversation_id, sender_id, content) VALUES ($1, $2, $3) RETURNING *",
                 [conversationId, req.user.userId, content]
             );
+            res.status(201).json(result.rows[0]);
         } catch (err) {
             console.error("Failed to store message: ", err);
             res.status(500).json({ error: "Failed to store message" });
@@ -94,8 +126,9 @@ chatRoutes.post(
 );
 
 chatRoutes.put(
-    "/updateStatus/:messageId",
+    ":conversationId/updateStatus/:messageId",
     authenticateToken,
+    verifyConversationAccess,
     async (req, res) => {
         try {
             await db.query(
