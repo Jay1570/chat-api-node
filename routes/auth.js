@@ -26,11 +26,15 @@ authRoutes.post("/signup", async (req, res) => {
 
         const hashed = await bcrypt.hash(password, 10);
         const result = await db.query(
-            "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name",
+            "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, image_url AS imageUrl",
             [name, email, hashed]
         );
 
-        res.status(201).json({ user: result.rows[0] });
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+            expiresIn: "7d",
+        });
+
+        res.status(201).json({ token, user: result.rows[0] });
     } catch (err) {
         console.error("Signup Error: ", err);
         res.status(400).json({ error: "Registration failed" });
@@ -63,7 +67,7 @@ authRoutes.post("/login", async (req, res) => {
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
             expiresIn: "7d",
         });
-        res.json({ token, user: { userId: user.id, name: user.name } });
+        res.json({ token, user: { userId: user.id, name: user.name, email: user.email, imageUrl: user.image_url } });
     } catch (err) {
         console.error("Login Error: ", err);
         res.status(500).json({ error: "Login Failed" });
