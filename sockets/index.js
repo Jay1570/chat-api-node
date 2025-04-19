@@ -1,5 +1,5 @@
 import { authenticateSocket } from "../middleware/auth.js";
-import db from "../config/db.js";
+import db from "../config/sequelize.js";
 
 const connectedUsers = new Map(); // userId → socket.id
 

@@ -1,37 +1,46 @@
 import express from "express";
-import db from "../config/db.js";
+import { User } from "../models/index.js";
+import { Op } from "sequelize";
 import { authenticateToken } from "../middleware/auth.js";
 
 const userRoutes = express.Router();
 
+// Get current user profile
 userRoutes.get("/me", authenticateToken, async (req, res) => {
     try {
-        const result = await db.query(
-            "SELECT id, name, email, image_url, created_at FROM users WHERE id = $1",
-            [req.user.userId]
-        );
+        const user = await User.findByPk(req.user.userId, {
+            attributes: ["id", "name", "email", "image_url", "created_at"],
+        });
 
-        if (result.rowCount === 0)
+        if (!user) {
             return res.status(404).json({ error: "User not found" });
+        }
 
-        res.json(result.rows[0]);
+        res.json(user);
     } catch (err) {
         console.error("Failed to fetch user: ", err);
         res.status(500).json({ error: "Failed to fetch user" });
     }
 });
 
+// Update user avatar
 userRoutes.put("/avatar", authenticateToken, async (req, res) => {
     const { avatar_url } = req.body;
 
-    if (!avatar_url)
+    if (!avatar_url) {
         return res.status(400).json({ error: "avatar_url required" });
+    }
 
     try {
-        await db.query("UPDATE users SET image_url = $1 WHERE id = $2", [
-            avatar_url,
-            req.user.userId,
-        ]);
+        const [updatedRows] = await User.update(
+            { image_url: avatar_url },
+            { where: { id: req.user.userId } }
+        );
+
+        if (updatedRows === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
         res.json({ success: true });
     } catch (err) {
         console.error("Failed to update image: ", err);
@@ -39,16 +48,24 @@ userRoutes.put("/avatar", authenticateToken, async (req, res) => {
     }
 });
 
+// Update user name
 userRoutes.put("/name", authenticateToken, async (req, res) => {
     const { name } = req.body;
 
-    if (!name) return res.status(400).json({ error: "name required" });
+    if (!name) {
+        return res.status(400).json({ error: "name required" });
+    }
 
     try {
-        await db.query("UPDATE users SET name = $1 WHERE id = $2", [
-            name,
-            req.user.userId,
-        ]);
+        const [updatedRows] = await User.update(
+            { name },
+            { where: { id: req.user.userId } }
+        );
+
+        if (updatedRows === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
         res.json({ success: true });
     } catch (err) {
         console.error("Failed to update name: ", err);
@@ -56,38 +73,51 @@ userRoutes.put("/name", authenticateToken, async (req, res) => {
     }
 });
 
+// Get user by ID
 userRoutes.get("/:id", authenticateToken, async (req, res) => {
     const userId = req.params.id;
 
     try {
-        const result = await db.query(
-            "SELECT id, name, image_url FROM users WHERE id = $1",
-            [userId]
-        );
+        const user = await User.findByPk(userId, {
+            attributes: ["id", "name", "image_url"],
+        });
 
-        if (result.rowCount === 0)
+        if (!user) {
             return res.status(404).json({ error: "User not found" });
+        }
 
-        res.json(result.rows[0]);
+        res.json(user);
     } catch (err) {
         console.error("Failed to fetch user: ", err);
         res.status(500).json({ error: "Failed to fetch user" });
     }
 });
 
+// Search users
 userRoutes.get("/search", authenticateToken, async (req, res) => {
     const { criteria } = req.query;
 
-    if (!criteria)
+    if (!criteria) {
         return res.status(400).json({ error: "Search criteria is required" });
+    }
 
     try {
-        const result = await db.query(
-            "SELECT id, name, email, image_url FROM users WHERE (name ILIKE $1 OR email ILIKE $1) AND id != $2",
-            [`%${criteria}%`, req.user.userId]
-        );
+        const users = await User.findAll({
+            attributes: ["id", "name", "email", "image_url"],
+            where: {
+                [Op.and]: [
+                    {
+                        [Op.or]: [
+                            { name: { [Op.iLike]: `%${criteria}%` } },
+                            { email: { [Op.iLike]: `%${criteria}%` } },
+                        ],
+                    },
+                    { id: { [Op.ne]: Number(req.user.userId) } },
+                ],
+            },
+        });
 
-        res.json(result.rows);
+        res.json(users);
     } catch (err) {
         console.error("Failed to fetch users: ", err);
         res.status(500).json({ error: "Failed to fetch users" });

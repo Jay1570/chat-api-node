@@ -7,7 +7,7 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import { authenticateSocket } from "./middleware/auth.js";
 import { initSocketHandlers } from "./sockets/index.js";
-import db from "./config/db.js";
+
 import chatRoutes from "./routes/chats.js";
 
 dotenv.config();
@@ -25,7 +25,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/chats", chatRoutes)
+app.use("/api/chats", chatRoutes);
 
 io.use(authenticateSocket);
 io.on("connection", (socket) => {
