@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Tokens, User } from "../models/index.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const authRoutes = express.Router();
 
@@ -105,6 +106,10 @@ authRoutes.post("/login", async (req, res) => {
         console.error("Login Error: ", err);
         res.status(500).json({ error: "Login Failed" });
     }
+});
+
+authRoutes.get("/validate-token", authenticateToken, (req, res) => {
+    res.status(200).json({ valid: true });
 });
 
 export default authRoutes;

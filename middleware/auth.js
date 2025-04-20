@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { Tokens } from "../models/index.js";
 
 export const authenticateToken = async (req, res, next) => {
+    console.log("Validating User");
     const authHeader = req.headers.authorization;
     const token = authHeader?.split(" ")[1];
 
@@ -24,6 +25,7 @@ export const authenticateToken = async (req, res, next) => {
                     .json({ error: "Token has been revoked" });
 
             req.user = user;
+            console.log("User Validated");
             next();
         } catch (err) {
             console.error("Token DB check error: ", err);
