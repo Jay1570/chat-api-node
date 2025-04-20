@@ -73,26 +73,6 @@ userRoutes.put("/name", authenticateToken, async (req, res) => {
     }
 });
 
-// Get user by ID
-userRoutes.get("/:id", authenticateToken, async (req, res) => {
-    const userId = req.params.id;
-
-    try {
-        const user = await User.findByPk(userId, {
-            attributes: ["id", "name", "image_url"],
-        });
-
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
-        }
-
-        res.json(user);
-    } catch (err) {
-        console.error("Failed to fetch user: ", err);
-        res.status(500).json({ error: "Failed to fetch user" });
-    }
-});
-
 // Search users
 userRoutes.get("/search", authenticateToken, async (req, res) => {
     const { criteria } = req.query;
@@ -112,7 +92,7 @@ userRoutes.get("/search", authenticateToken, async (req, res) => {
                             { email: { [Op.iLike]: `%${criteria}%` } },
                         ],
                     },
-                    { id: { [Op.ne]: Number(req.user.userId) } },
+                    { id: { [Op.ne]: req.user.userId } },
                 ],
             },
         });
@@ -121,6 +101,26 @@ userRoutes.get("/search", authenticateToken, async (req, res) => {
     } catch (err) {
         console.error("Failed to fetch users: ", err);
         res.status(500).json({ error: "Failed to fetch users" });
+    }
+});
+
+// Get user by ID
+userRoutes.get("/:id", authenticateToken, async (req, res) => {
+    const userId = req.params.id;
+
+    try {
+        const user = await User.findByPk(userId, {
+            attributes: ["id", "name", "image_url"],
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.json(user);
+    } catch (err) {
+        console.error("Failed to fetch user: ", err);
+        res.status(500).json({ error: "Failed to fetch user" });
     }
 });
 

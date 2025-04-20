@@ -1,7 +1,7 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { User } from "../models/index.js";
+import { Tokens, User } from "../models/index.js";
 
 const authRoutes = express.Router();
 
@@ -45,6 +45,11 @@ authRoutes.post("/signup", async (req, res) => {
             expiresIn: "7d",
         });
 
+        await Tokens.create({
+            user_id: user.id,
+            token: token,
+        });
+
         res.status(201).json({ token, user: userData });
     } catch (err) {
         console.error("Signup Error: ", err);
@@ -75,9 +80,16 @@ authRoutes.post("/login", async (req, res) => {
                 .status(401)
                 .json({ error: "Incorrect email or password" });
 
+        await Tokens.destroy({ where: { user_id: user.id } });
+
         // Sign JWT token
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
             expiresIn: "7d",
+        });
+
+        await Tokens.create({
+            user_id: user.id,
+            token: token,
         });
 
         // Create response data
