@@ -30,9 +30,7 @@ const User = sequelize.define(
     {
         tableName: "users",
         underscored: true,
-        timestamps: false,
-        createdAt: "created_at",
-        updatedAt: false,
+        timestamps: true,
     }
 );
 

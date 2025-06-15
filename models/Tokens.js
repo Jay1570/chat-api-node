@@ -26,9 +26,7 @@ const Tokens = sequelize.define(
     {
         tableName: "oauth_jwt_tokens",
         underscored: true,
-        timestamps: false,
-        createdAt: "created_at",
-        updatedAt: false,
+        timestamps: true,
     }
 );
 

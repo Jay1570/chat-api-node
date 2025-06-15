@@ -2,7 +2,12 @@ import User from "./Users.js";
 import Conversation from "./Conversations.js";
 import Message from "./Messages.js";
 import Tokens from "./Tokens.js";
+import sequelize from "../config/sequelize.js";
 
+sequelize.sync({
+    // alter:true, /*
+    alter: false, /**/
+})
 User.hasMany(Message, { foreignKey: "sender_id" });
 Message.belongsTo(User, { foreignKey: "sender_id" });
 
