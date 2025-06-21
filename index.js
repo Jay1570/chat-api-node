@@ -1,7 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import http from "http";
+import https from "https";
+import fs from "fs";
 import { Server } from "socket.io";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
@@ -13,7 +14,13 @@ import chatRoutes from "./routes/chats.js";
 dotenv.config();
 
 const app = express();
-const server = http.createServer(app);
+
+const options = {
+    key: fs.readFileSync("./private.key"),
+    cert: fs.readFileSync("./certificate.crt")
+}
+
+const server = https.createServer(options, app);
 const io = new Server(server, {
     cors: {
         origin: "*",
